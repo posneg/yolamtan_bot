@@ -1,0 +1,4 @@
+logs/*
+env.toml
+storage.toml
+runBot.bat
