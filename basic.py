@@ -8,7 +8,8 @@ from discord.ext import commands
 import toml
 
 env = toml.load('./env.toml')
-data = toml.load('./storage.toml')
+DATA_FILE = './storage.toml'
+data = toml.load(DATA_FILE)
 
 
 bot = commands.Bot(command_prefix=env['prefix'])
@@ -133,6 +134,7 @@ async def set_pronoun(ctx, pronoun):
             .format(pronoun)
         )
 
+
 @bot.command(
     brief='Lists the available pronoun roles'
 )
@@ -150,12 +152,37 @@ async def list_pronouns(ctx):
     output_string += "```"
     await ctx.send(output_string)
 
+
 #Command to close the bot cleanly
 @bot.command()
 @commands.is_owner()
 async def close_bot(ctx):
     bot_logger.info('Received close_bot command from owner.  Exiting')
     await bot.close()
+
+
+@bot.command()
+@commands.check(is_correct_channel())
+@commands.has_guild_permissions(administrator=True)
+@commands.max_concurrency(1, wait=True)
+async def create_pronoun_role(ctx, role_name, shorthand):
+    shorthand = shorthand.lower()
+    if 'pronoun_roles' not in data['servers'][str(ctx.guild.id)]:
+        bot_logger.info('Enabling pronoun roles for guild %s', ctx.guild.name)
+        data['servers'][str(ctx.guild.id)]['pronoun_roles'] = {}
+
+    existing_role = discord.utils.get(ctx.guild.roles, name=role_name)
+    if existing_role is not None:
+        data['servers'][str(ctx.guild.id)]['pronoun_roles'][shorthand] = existing_role.id
+        await ctx.send("Set up pronoun role {0.name}".format(new_role))
+    else:
+        new_role = await ctx.guild.create_role(name=role_name, reason="New pronoun role")
+        data['servers'][str(ctx.guild.id)]['pronoun_roles'][shorthand] = new_role.id
+        await ctx.send("Created new pronoun role {0.name}".format(new_role))
+
+    bot_logger.debug('Writing out the data dictionary')
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        toml.dump(data, f)
 
 
 #When the bot is ready, setup the "game" and print out to console
