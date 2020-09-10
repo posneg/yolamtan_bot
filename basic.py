@@ -154,7 +154,7 @@ async def list_pronouns(ctx):
 
 
 #Command to close the bot cleanly
-@bot.command()
+@bot.command(hidden=True)
 @commands.is_owner()
 async def close_bot(ctx):
     bot_logger.info('Received close_bot command from owner.  Exiting')
