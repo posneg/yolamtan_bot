@@ -1,1 +1,19 @@
 #storage example
+
+# Only edit the storage file while the bot is not active.  Any changes while the bot is active will not
+# be preserved.
+
+# Your storage needs a few things to start -- it needs the "servers" dictionary, which should include the ID
+# of any server you wish to use this bot in as its own dictionary.  e.g.
+[servers.server1_id_no]
+# Inside each server dictionary, you should have a list called "bot_channels" which determines from where
+# the bot can receive commands.  To allow any channel, use the sentinel value -1.
+bot_channels = [ -1, ]
+
+[servers.server2_id_no]
+bot_channels = [ 1234567890, 1111111111, ]
+
+# To enable pronoun roles, create a dictionary inside the desired server called "pronoun_roles".
+# You can then add premade roles directly into the file, or add them through commands while the bot is running.
+
+[servers.server2_id_no.pronoun_roles]
