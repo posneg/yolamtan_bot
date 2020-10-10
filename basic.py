@@ -8,7 +8,7 @@ from discord.ext import commands
 import toml
 
 env = toml.load('./env.toml')
-DATA_FILE = './storage.toml'
+DATA_FILE = './storage_test.toml'
 data = toml.load(DATA_FILE)
 
 
@@ -66,7 +66,8 @@ def is_correct_channel():
     help="""Sets a user's color through the use of user ID based roles.
 Using the optional hex_code argument, one can pass in a valid 6-digit hexadecimal color to use.
 Alternatively, they may leave that field blank for a random color""",
-    usage='<hex_code>'
+    usage='<hex_code>',
+    hidden=True
 )
 @commands.check(is_correct_channel())
 async def color(ctx, *args):
@@ -104,6 +105,70 @@ async def color(ctx, *args):
         bot_logger.debug('Gave color role to user %s', ctx.author)
     await ctx.send('Color for {0.mention} set to {1}'.format(ctx.author, hexcode))
     bot_logger.debug('Color for %s set to %s', str(ctx.author), hexcode)
+
+
+@bot.command(
+    brief="Sets a user's color role",
+    help="""Sets a user's color role to the role identified by the string provided.""",
+    name='color_role'
+)
+@commands.check(is_correct_channel())
+async def set_color_role(ctx, *, role_name):
+    # Extract the color_roles data so it's more easily accessible
+    color_roles = data['servers'][str(ctx.guild.id)].get('color_roles')
+    if color_roles is None:
+        color_roles = {}
+        data['servers'][str(ctx.guild.id)]['color_roles'] = color_roles
+    # First things first -- does the user already have a color role?
+    if any(str(r.id) in color_roles for r in ctx.author.roles):
+        await ctx.send("You may only have one color role at a time.  Please remove your color role via the unset_color command")
+        return
+
+    # Next, check if the desired role already exists.
+    correctly_named = filter(lambda r: r.name == role_name, ctx.guild.roles)
+    for role in correctly_named:
+        data_entry = color_roles.get(str(role.id))
+        if data_entry is not None:
+            await ctx.author.add_roles(role, reason='Applying color role to new user')
+            await ctx.send("Applied the color role {0.mention} to user {1.mention}.  The current owner of this role is {2.mention}"
+                .format(role, ctx.author, ctx.guild.get_member(data_entry['owner'])))
+            bot_logger.debug('Color role for %s set to %s', str(ctx.author), str(role))
+            return
+
+    # If the above code did not return, this must be a new role.  Create it!
+    bot_logger.debug('Creating new color role %s', role_name)
+    new_color_role = await ctx.guild.create_role(name=role_name)
+    await ctx.author.add_roles(new_color_role, reason='Applying new color role to user')
+    color_roles[str(new_color_role.id)] = {"owner": ctx.author.id}
+    await ctx.send('Created new color role {0.mention}.  {1.mention} is the owner of this role.'.format(new_color_role, ctx.author))
+    bot_logger.debug('Writing out the data dictionary')
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        toml.dump(data, f)
+
+
+@bot.command(
+    brief="Removes a user's color role.",
+    name='unset_color'
+)
+@commands.check(is_correct_channel())
+async def unset_color_role(ctx):
+    # Extract the color_roles data so it's more easily accessible
+    color_roles = data['servers'][str(ctx.guild.id)].get('color_roles')
+    if color_roles is None:
+        return
+
+    for possible_color in ctx.author.roles:
+        data_entry = color_roles.get(str(possible_color.id))
+        if data_entry is not None:
+            bot_logger.debug("Remove color role %s from user %s", str(possible_color), str(ctx.author))
+            await ctx.author.remove_roles(possible_color, reason='Unset color role')
+            await ctx.send('Removed role {0} from user {1.mention}'.format(str(possible_color),ctx.author))
+            if data_entry.get('owner') == ctx.author.id and len(possible_color.members) > 0:
+                data_entry['owner'] = possible_color.members[0].id
+            elif data_entry.get('owner') == ctx.author.id:
+                await possible_color.delete(reason='Removing unused color role')
+                await ctx.send('Deleted above color role after the role\'s last user left')
+                del data_entry['owner']
 
 
 @bot.command(

@@ -2,3 +2,4 @@ logs/*
 env.toml
 storage.toml
 runBot.bat
+storage_test.toml
