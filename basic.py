@@ -52,7 +52,7 @@ async def on_message(message):
 # Check to see if this is being sent in the correct channel
 def is_correct_channel():
     def predicate(ctx):
-        if ctx.guild is not None and ctx.guild.id in data['servers'].keys():
+        if ctx.guild is not None and str(ctx.guild.id) in data['servers'].keys():
                 acceptable_channels = data['servers'][str(ctx.guild.id)]['bot_channels']
                 return -1 in acceptable_channels or ctx.channel.id in acceptable_channels
         else:
