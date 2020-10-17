@@ -52,7 +52,7 @@ async def on_message(message):
 # Check to see if this is being sent in the correct channel
 def is_correct_channel():
     def predicate(ctx):
-        if ctx.guild is not None and ctx.guild.id in data['servers'].keys():
+        if ctx.guild is not None and str(ctx.guild.id) in data['servers'].keys():
                 acceptable_channels = data['servers'][str(ctx.guild.id)]['bot_channels']
                 return -1 in acceptable_channels or ctx.channel.id in acceptable_channels
         else:
@@ -69,7 +69,7 @@ Alternatively, they may leave that field blank for a random color""",
     usage='<hex_code>',
     hidden=True
 )
-@commands.check(is_correct_channel())
+@is_correct_channel()
 async def color(ctx, *args):
     if len(args) == 0:
         red_val = random.randint(0, 0xFF)
@@ -176,7 +176,7 @@ async def unset_color_role(ctx):
     help="Sets a user's own pronoun role. If the user already has the provided pronoun role, removes it instead.",
     name='pronoun'
 )
-@commands.check(is_correct_channel())
+@is_correct_channel()
 async def set_pronoun(ctx, pronoun):
     if 'pronoun_roles' not in data['servers'][str(ctx.guild.id)]:
         await ctx.send('Pronoun roles are not yet supported for this server. Please contact an admin for assistance.')
@@ -203,7 +203,7 @@ async def set_pronoun(ctx, pronoun):
 @bot.command(
     brief='Lists the available pronoun roles'
 )
-@commands.check(is_correct_channel())
+@is_correct_channel()
 async def list_pronouns(ctx):
     if 'pronoun_roles' not in data['servers'][str(ctx.guild.id)]:
         await ctx.send('Pronoun roles are not yet supported for this server. Please contact an admin for assistance.')
@@ -227,7 +227,7 @@ async def close_bot(ctx):
 
 
 @bot.command()
-@commands.check(is_correct_channel())
+@is_correct_channel()
 @commands.has_guild_permissions(administrator=True)
 @commands.max_concurrency(1, wait=True)
 async def create_pronoun_role(ctx, role_name, shorthand):
