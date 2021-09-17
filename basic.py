@@ -4,8 +4,11 @@ import string
 import random
 import sys
 import logging
+from discord import voice_client
 from discord.ext import commands
+from discord.player import FFmpegAudio
 import toml
+import ffmpeg
 
 env = toml.load('./env.toml')
 DATA_FILE = './storage.toml'
@@ -210,6 +213,56 @@ async def set_reaction(message, image):
 #                        'Available commands:\n**$help**: Displays this help text\n' +
 #                        '**$color**: Sets your user\'s role color to a random hex value\n' +
 #                        '**$color [hex_code]**: Sets your user\'s role color to the provided hex code')
+
+
+
+# Everything after this point should be separated in a music player class or something
+
+# Command bot to join voice channel
+@bot.command(
+    brief="Adds bot to voice channel",
+    help="""Commands bot to join the voice channel the commanding user is in""",
+    name="join_voice"
+)
+async def join_voice(ctx):
+    channel = ctx.author.voice.channel
+    await channel.connect()
+
+@bot.command(
+    brief="Removes bot from voice channel",
+    help="""Removes the bot from whichever voice channel it is currently in."""
+)
+async def leave_voice(ctx):
+    await ctx.voice_client.disconnect()
+
+@bot.command(
+    brief="Plays a single song",
+    help="""Plays a single song given an audio file's name"""
+)
+async def play_song(ctx, song_name):
+    audio_source = discord.FFmpegPCMAudio(song_name)
+    if not ctx.voice_client.is_playing():
+        ctx.voice_client.play(audio_source, after=None)
+
+# Uses filter to create new audio file with filter applied, then plays it
+@bot.command(
+    brief="Plays a song with nightcore filter",
+    help="""Applies a nightcore filter to an audio file,
+    saves the filtered file and plays the song."""
+)
+async def play_song_nightcore(ctx, song_name):
+    inn = ffmpeg.input(song_name)
+        
+    filtered = (inn.filter('asetrate', 44100*1.2).filter('aresample', 44100).filter('atempo',1.0))
+    outt = ffmpeg.output(filtered, song_name+'_nightcore.mp3')
+    outt.run(overwrite_output=True)
+
+    audio_source = discord.FFmpegPCMAudio(song_name+'_nightcore.mp3')
+    if not ctx.voice_client.is_playing():
+        ctx.voice_client.play(audio_source, after=None)
+
+
+## Music player code cutoff
 
 
 if __name__ == '__main__':
