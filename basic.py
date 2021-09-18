@@ -1,3 +1,4 @@
+from music_player.player import Player
 import discord
 import asyncio
 import string
@@ -16,6 +17,7 @@ data = toml.load(DATA_FILE)
 
 
 bot = commands.Bot(command_prefix=env['prefix'])
+player = Player('fake_guild_id')
 
 
 ## Set up logging
@@ -216,53 +218,85 @@ async def set_reaction(message, image):
 
 
 
-# Everything after this point should be separated in a music player class or something
 
-# Command bot to join voice channel
+########### This code is for the music player ####################
+# I think theres a way to register commands from a separate file somehow
+
+
 @bot.command(
     brief="Adds bot to voice channel",
     help="""Commands bot to join the voice channel the commanding user is in""",
     name="join_voice"
 )
 async def join_voice(ctx):
-    channel = ctx.author.voice.channel
+    if not ctx.message.author.voice:
+        await ctx.send("{} is not connected to a voice channel".format(ctx.message.author.name))
+        return
+    else:
+        channel = ctx.message.author.voice.channel
     await channel.connect()
+
 
 @bot.command(
     brief="Removes bot from voice channel",
-    help="""Removes the bot from whichever voice channel it is currently in."""
+    help="""Removes the bot from whichever voice channel it is currently in.""",
+    name="leave_voice"
 )
 async def leave_voice(ctx):
     await ctx.voice_client.disconnect()
 
+
 @bot.command(
     brief="Plays a single song",
-    help="""Plays a single song given an audio file's name"""
+    help="""Plays a single song given an mp3's name. If a song is already playing,
+    it adds the song to a queue to be played when the current song ends. Will
+    automatically add bot to a voice channel if its not in one already.""",
+    name="play"
 )
-async def play_song(ctx, song_name):
-    audio_source = discord.FFmpegPCMAudio(song_name)
-    if not ctx.voice_client.is_playing():
-        ctx.voice_client.play(audio_source, after=None)
+async def play(ctx, song_name, filter=""):
+    if not ctx.voice_client or not ctx.voice_client.is_connected():
+        await join_voice(ctx)
 
-# Uses filter to create new audio file with filter applied, then plays it
+    await player.play_song(ctx, song_name, filter)
+
+
 @bot.command(
-    brief="Plays a song with nightcore filter",
-    help="""Applies a nightcore filter to an audio file,
-    saves the filtered file and plays the song."""
+    brief="Skips the current song",
+    help="""Skips the song currently being played. Doesn't use voting yet.""",
+    name="skip"
 )
-async def play_song_nightcore(ctx, song_name):
-    inn = ffmpeg.input(song_name)
-        
-    filtered = (inn.filter('asetrate', 44100*1.2).filter('aresample', 44100).filter('atempo',1.0))
-    outt = ffmpeg.output(filtered, song_name+'_nightcore.mp3')
-    outt.run(overwrite_output=True)
-
-    audio_source = discord.FFmpegPCMAudio(song_name+'_nightcore.mp3')
-    if not ctx.voice_client.is_playing():
-        ctx.voice_client.play(audio_source, after=None)
+async def skip(ctx):
+    await player.skip(ctx)
 
 
-## Music player code cutoff
+@bot.command(
+    brief="Pauses music player",
+    name="pause"
+)
+async def pause(ctx):
+    await player.pause(ctx)
+
+
+@bot.command(
+    brief="Resumes the last song being played",
+    name="resume"
+)
+async def resume(ctx):
+    await player.resume(ctx)
+
+
+@bot.command(
+    brief="Stops the song currently being played",
+    help="""Stops the song currently being played. You cannot resume play of this song.
+    When you request to play a new song, it will start playing whatever was next
+    in the queue.""",
+    name="stop"
+)
+async def stop(ctx):
+    await player.stop(ctx)
+
+
+########### Music player code cutoff ########################
 
 
 if __name__ == '__main__':
