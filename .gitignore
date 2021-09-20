@@ -3,3 +3,7 @@ env.toml
 storage.toml
 storage_test.toml
 runBot.bat
+
+__pycache__/
+*.py[cod]
+*$py.class
