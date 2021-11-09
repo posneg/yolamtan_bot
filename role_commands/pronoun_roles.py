@@ -58,7 +58,7 @@ class PronounRoles(commands.Cog):
             await ctx.send("Created new pronoun role {0.name}".format(new_role))
 
         self.bot.bot_logger.debug('Writing out the self.bot.data dictionary')
-        with open(self.bot.DATA_FILE, "w", encoding="utf-8") as f:
+        with open(self.bot.data_file, "w", encoding="utf-8") as f:
             toml.dump(self.bot.data, f)
 
 
