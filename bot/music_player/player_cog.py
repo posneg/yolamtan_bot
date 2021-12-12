@@ -3,13 +3,13 @@ from discord.ext import commands
 from discord.player import FFmpegAudio
 import ffmpeg
 
-import yolamtanBot.music_player.player
+import bot.music_player.player
 
 class PlayerCog(commands.Cog):
 
     def __init__(self):
         # For right now, I'm using a single music player.
-        self.player = yolamtanBot.music_player.player.Player('Fake Guild ID')
+        self.player = bot.music_player.player.Player('Fake Guild ID')
 
         # if you want a dictionary of individual players or such,
         # this is where you'd put it.  Something like:
