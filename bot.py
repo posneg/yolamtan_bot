@@ -41,6 +41,7 @@ class YolamtanBot(commands.Bot):
         if (message.author != self.user
                 and message.guild is not None
                 and str(message.guild.id) in self.data['servers'].keys()
+                and len(message.guild.emojis) > 0
                 and random.random() < 0.01):
             self.bot_logger.debug('Decided to react to following message:\n%s\n\nMESSAGE END', str(message.content))
             emote = message.guild.emojis[random.randint(0, len(message.guild.emojis) - 1)]
