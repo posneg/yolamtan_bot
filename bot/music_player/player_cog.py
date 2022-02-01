@@ -1,7 +1,6 @@
-from discord import voice_client
 from discord.ext import commands
-from discord.player import FFmpegAudio
-import ffmpeg
+
+from bot import yolamtanbot
 
 #import bot.music_player.player
 from bot.music_player.player import Player
@@ -10,12 +9,15 @@ from bot.music_player.player import Player
 # Handles requests directly from discord, passing them along to their appropriate players
 class PlayerCog(commands.Cog):
 
-    def __init__(self):
+    def __init__(self, bot: yolamtanbot.YolamtanBot):
+        self.bot.bot_logger.debug('Initializing player cog')
         self.players = {}
+        self.bot = bot
 
     def create_player_if_needed(self, guild_id):
         if not guild_id in self.players.keys():
-            self.players[guild_id] = Player(guild_id)
+            self.bot.bot_logger.debug('Creating new player for guild id: %s', guild_id)
+            self.players[guild_id] = Player(guild_id, self.bot)
 
     @commands.command(
         brief="Adds bot to voice channel",
@@ -26,12 +28,11 @@ class PlayerCog(commands.Cog):
         if not ctx.message.author.voice:
             await ctx.send("{} is not connected to a voice channel".format(ctx.message.author.name))
             return
-        elif ctx.voice_client and ctx.voice_client.is_connected():
-            await ctx.send("Bot is already connected to a voice channel.")
-            return
         else:
             self.create_player_if_needed(ctx.message.guild.id)
             channel = ctx.message.author.voice.channel
+  
+        self.bot.bot_logger.debug('Attempting to connect to channel in guild id: %s', ctx.message.guild.id)
         await channel.connect()
 
 
@@ -41,8 +42,11 @@ class PlayerCog(commands.Cog):
         name="leave_voice"
     )
     async def leave_voice(self, ctx):
+        # Add some kind of error handling for when the bot is disconnected by force? 
+        # It gets buggy if the bot isn't disconnected through here
         await ctx.voice_client.disconnect()
         del self.players[ctx.message.guild.id]
+        self.bot.bot_logger.debug('Disconnected and deleted player in guild id: %s', ctx.message.guild.id)
 
 
     @commands.command(
@@ -53,10 +57,8 @@ class PlayerCog(commands.Cog):
         name="play_local"
     )
     async def play_local(self, ctx, song_name, filter=""):
+        self.bot.bot_logger.debug('Recieved play_local command on song %s', song_name)
         self.create_player_if_needed(ctx.message.guild.id)
-
-        # if not ctx.voice_client or not ctx.voice_client.is_connected():
-        #     await self.join_voice(ctx)
 
         await self.players[ctx.message.guild.id].play_local_song(ctx, song_name, filter)
 
@@ -68,7 +70,8 @@ class PlayerCog(commands.Cog):
         automatically add bot to a voice channel if its not in one already.""",
         name="play"
     )
-    async def play(self, ctx, url, filter=""):
+    async def play(self, ctx, url):
+        self.bot.bot_logger.debug('Recieved play command on url %s', url)
         self.create_player_if_needed(ctx.message.guild.id)
 
         await self.players[ctx.message.guild.id].play(ctx, url, filter)
@@ -108,14 +111,3 @@ class PlayerCog(commands.Cog):
     )
     async def stop(self, ctx):
         await self.players[ctx.message.guild.id].stop(ctx)
-
-    
-    @play.before_invoke
-    @play_local.before_invoke
-    async def ensure_voice(self, ctx):
-        if ctx.voice_client is None:
-            if ctx.author.voice:
-                await ctx.author.voice.channel.connect()
-            else:
-                await ctx.send("You are not connected to a voice channel.")
-                #raise commands.CommandError("Author not connected to a voice channel.")
