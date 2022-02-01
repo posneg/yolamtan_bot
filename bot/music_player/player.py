@@ -87,31 +87,32 @@ class Player:
         return song.Song(audio_source, song_name, duration)
 
     # Plays from a url (almost anything youtube_dl supports)
-    async def play(self, ctx, url, filter_name):
+    async def play(self, ctx, url):
         async with ctx.typing():
-            if ("" != filter_name):
-                self.bot.bot_logger.debug('Filter parameter %s given', filter_name)
-                self.bot.bot_logger.debug('Getting audio from url: %s', url)
-                yt_object = await YTDLSource.from_url(url)
-                file = yt_object['file']
-                title = yt_object['data']['title']
-                filename = ''.join(file.split('.')[:-1])
-                extension = file.split('.')[-1]
-                self.bot.bot_logger.debug('Retrieved song: %s', title)
+            # Unusued filter code, will be used in a seperate filter-supported command
+            # if ("" != filter_name):
+            #     self.bot.bot_logger.debug('Filter parameter %s given', filter_name)
+            #     self.bot.bot_logger.debug('Getting audio from url: %s', url)
+            #     yt_object = await YTDLSource.from_url(url)
+            #     file = yt_object['file']
+            #     title = yt_object['data']['title']
+            #     filename = ''.join(file.split('.')[:-1])
+            #     extension = file.split('.')[-1]
+            #     self.bot.bot_logger.debug('Retrieved song: %s', title)
 
-                audio_source = filters[filter_name](filename,extension)
-                self.bot.bot_logger.debug('Retrieved audio source for filtered song %s', title)
-                duration = ffmpeg.probe(filename+"_"+filter_name+"."+extension)['format']['duration']
-            else: # Same as with filter but doesn't pre-download.
-                self.bot.bot_logger.debug('Getting audio from url: %s', url)
-                yt_object = await YTDLSource.from_url(url, stream=True)
-                url_player = yt_object['file']
-                title = yt_object['data']['title']
-                self.bot.bot_logger.debug('Retrieved song: %s', title)
+            #     audio_source = filters[filter_name](filename,extension)
+            #     self.bot.bot_logger.debug('Retrieved audio source for filtered song %s', title)
+            #     duration = ffmpeg.probe(filename+"_"+filter_name+"."+extension)['format']['duration']
 
-                audio_source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(url_player, **ffmpeg_options))
-                self.bot.bot_logger.debug('Audio source retrieved for %s', title)
-                duration = yt_object['data']['duration']
+            self.bot.bot_logger.debug('Getting audio from url: %s', url)
+            yt_object = await YTDLSource.from_url(url, stream=True)
+            url_player = yt_object['file']
+            title = yt_object['data']['title']
+            self.bot.bot_logger.debug('Retrieved song: %s', title)
+
+            audio_source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(url_player, **ffmpeg_options))
+            self.bot.bot_logger.debug('Audio source retrieved for %s', title)
+            duration = yt_object['data']['duration']
             
             yt_song = song.Song(audio_source, title, duration)
             self.music_queue.put(yt_song)
@@ -126,7 +127,7 @@ class Player:
         vc = ctx.voice_client
 
         def after_song_end(error):
-            self.bot.bot_logger.debug('Ended song: %s', self.get_current_song.get_title())
+            self.bot.bot_logger.debug('Ended song')
             if not error and not vc.is_paused() and not vc.is_playing() and not self.music_queue.empty():
                 current_song = self.music_queue.get()
                 self.bot.bot_logger.debug('Playing song from callback: %s', current_song.get_title())
@@ -183,8 +184,6 @@ class YTDLSource(discord.PCMVolumeTransformer):
     def __init__(self, source, *, data, volume=0.5):
         super().__init__(source, volume)
 
-        self.bot.bot_logger.debug('Initializing YTDLSource')
-
         self.data = data
         self.filename = ""
 
@@ -195,7 +194,6 @@ class YTDLSource(discord.PCMVolumeTransformer):
     async def from_url(self, url, *, loop=None, stream=False):
         loop = loop or asyncio.get_event_loop()
         data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=not stream))
-        self.bot.bot_logger.debug('Extracted info from url')
 
         if 'entries' in data:
             # take first item from a playlist

@@ -14,7 +14,7 @@ class PlayerCog(commands.Cog):
         self.bot = bot
         self.bot.bot_logger.debug('Initializing player cog')
 
-    def create_player_if_needed(self, guild_id):
+    async def create_player_if_needed(self, guild_id):
         if not guild_id in self.players.keys():
             self.bot.bot_logger.debug('Creating new player for guild id: %s', guild_id)
             self.players[guild_id] = Player(guild_id, self.bot)
@@ -29,7 +29,7 @@ class PlayerCog(commands.Cog):
             await ctx.send("{} is not connected to a voice channel".format(ctx.message.author.name))
             return
         else:
-            self.create_player_if_needed(ctx.message.guild.id)
+            await self.create_player_if_needed(ctx.message.guild.id)
             channel = ctx.message.author.voice.channel
   
         self.bot.bot_logger.debug('Attempting to connect to channel in guild id: %s', ctx.message.guild.id)
@@ -58,7 +58,7 @@ class PlayerCog(commands.Cog):
     )
     async def play_local(self, ctx, song_name, filter=""):
         self.bot.bot_logger.debug('Recieved play_local command on song %s', song_name)
-        self.create_player_if_needed(ctx.message.guild.id)
+        await self.create_player_if_needed(ctx.message.guild.id)
 
         await self.players[ctx.message.guild.id].play_local_song(ctx, song_name, filter)
 
@@ -72,9 +72,9 @@ class PlayerCog(commands.Cog):
     )
     async def play(self, ctx, url):
         self.bot.bot_logger.debug('Recieved play command on url %s', url)
-        self.create_player_if_needed(ctx.message.guild.id)
+        await self.create_player_if_needed(ctx.message.guild.id)
 
-        await self.players[ctx.message.guild.id].play(ctx, url, filter)
+        await self.players[ctx.message.guild.id].play(ctx, url)
 
 
     @commands.command(
@@ -111,3 +111,13 @@ class PlayerCog(commands.Cog):
     )
     async def stop(self, ctx):
         await self.players[ctx.message.guild.id].stop(ctx)
+
+
+    @play.before_invoke
+    @play_local.before_invoke
+    async def ensure_voice(self, ctx):
+        if ctx.voice_client is None:
+            if ctx.author.voice:
+                await ctx.author.voice.channel.connect()
+            else:
+                await ctx.send("You are not connected to a voice channel.")
