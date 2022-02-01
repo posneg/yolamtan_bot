@@ -40,11 +40,11 @@ ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
 
 class Player:
     def __init__(self, guild_id, bot: yolamtanbot.YolamtanBot):
-        self.bot.bot_logger.debug('Inititalizing player for guild id: %s', guild_id)
         self.guild_id = guild_id
         self.music_queue = queue.Queue()
         self.current_song = None
         self.bot = bot
+        self.bot.bot_logger.debug('Inititalizing player for guild id: %s', guild_id)
 
 
     def __str__(self):

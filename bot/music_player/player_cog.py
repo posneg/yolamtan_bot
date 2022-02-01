@@ -10,9 +10,9 @@ from bot.music_player.player import Player
 class PlayerCog(commands.Cog):
 
     def __init__(self, bot: yolamtanbot.YolamtanBot):
-        self.bot.bot_logger.debug('Initializing player cog')
         self.players = {}
         self.bot = bot
+        self.bot.bot_logger.debug('Initializing player cog')
 
     def create_player_if_needed(self, guild_id):
         if not guild_id in self.players.keys():
