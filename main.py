@@ -24,6 +24,6 @@ if __name__ == '__main__':
 
     bot.add_cog(color_roles.ColorRoles(bot))
     bot.add_cog(pronoun_roles.PronounRoles(bot))
-    bot.add_cog(player_cog.PlayerCog())
+    bot.add_cog(player_cog.PlayerCog(bot))
 
     bot.run(bot.env['token'])
