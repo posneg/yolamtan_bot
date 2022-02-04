@@ -3,11 +3,11 @@ import toml
 import logging
 from discord.ext import commands
 
-from yolamtanBot.bot import YolamtanBot
+from bot import yolamtanbot
 
 class PronounRoles(commands.Cog):
 
-    def __init__(self, bot: YolamtanBot):
+    def __init__(self, bot: yolamtanbot.YolamtanBot):
         self.bot = bot
 
 

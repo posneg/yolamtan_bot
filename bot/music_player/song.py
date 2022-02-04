@@ -1,7 +1,5 @@
-import ffmpeg
 import math
 
-# Unused. Might use this to have more options with songs.
 class Song:
     def __init__(self, audio_source, title="", duration=0.0):
         self.audio_source = audio_source
