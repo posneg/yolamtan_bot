@@ -5,6 +5,7 @@ storage_test.toml
 runBot.bat
 
 __pycache__/
+.vscode/
 *.py[cod]
 *$py.class
 

@@ -1,17 +1,18 @@
+from bot.music_player.player import Player
 import discord
 import logging
-import string
 from discord.ext import commands
 
 from constants import *
-from bot import YolamtanBot
-from role_commands import color_roles
-from role_commands import pronoun_roles
+from bot import yolamtanbot
+from bot.role_commands import color_roles
+from bot.role_commands import pronoun_roles
+from bot.music_player import player_cog
 
 
 if __name__ == '__main__':
     # Add role commands
-    bot = YolamtanBot(data_path=DATA_FILE, env_path=ENV_FILE)
+    bot = yolamtanbot.YolamtanBot(data_path=DATA_FILE, env_path=ENV_FILE)
 
     # Set up discord.py's logger (Keep separate from my own)
     discord_logger = logging.getLogger('discord')
@@ -23,4 +24,6 @@ if __name__ == '__main__':
 
     bot.add_cog(color_roles.ColorRoles(bot))
     bot.add_cog(pronoun_roles.PronounRoles(bot))
+    bot.add_cog(player_cog.PlayerCog(bot))
+
     bot.run(bot.env['token'])
