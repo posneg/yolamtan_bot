@@ -70,11 +70,11 @@ class PlayerCog(commands.Cog):
         automatically add bot to a voice channel if its not in one already.""",
         name="play"
     )
-    async def play(self, ctx, url):
-        self.bot.bot_logger.debug('Recieved play command on url %s', url)
+    async def play(self, ctx, *, search_input):
+        self.bot.bot_logger.debug('Recieved play command on url %s', search_input)
         await self.create_player_if_needed(ctx.message.guild.id)
 
-        await self.players[ctx.message.guild.id].play(ctx, url)
+        await self.players[ctx.message.guild.id].play(ctx, search_input)
 
 
     @commands.command(
