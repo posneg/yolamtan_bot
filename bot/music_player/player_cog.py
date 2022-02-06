@@ -71,7 +71,7 @@ class PlayerCog(commands.Cog):
         name="play"
     )
     async def play(self, ctx, *, search_input):
-        self.bot.bot_logger.debug('Recieved play command on url %s', search_input)
+        self.bot.bot_logger.debug('Recieved play command with search input %s', search_input)
         await self.create_player_if_needed(ctx.message.guild.id)
 
         await self.players[ctx.message.guild.id].play(ctx, search_input)
