@@ -87,7 +87,7 @@ class Player:
         return song.Song(audio_source, song_name, duration)
 
     # Plays from a url (almost anything youtube_dl supports)
-    async def play(self, ctx, url):
+    async def play(self, ctx, search_input):
         async with ctx.typing():
             # Unusued filter code, will be used in a seperate filter-supported command
             # if ("" != filter_name):
@@ -104,8 +104,8 @@ class Player:
             #     self.bot.bot_logger.debug('Retrieved audio source for filtered song %s', title)
             #     duration = ffmpeg.probe(filename+"_"+filter_name+"."+extension)['format']['duration']
 
-            self.bot.bot_logger.debug('Getting audio from url: %s', url)
-            yt_object = await YTDLSource.from_url(url, stream=True)
+            self.bot.bot_logger.debug('Getting audio from search input: %s', search_input)
+            yt_object = await YTDLSource.from_url(search_input, stream=True)
             url_player = yt_object['file']
             title = yt_object['data']['title']
             self.bot.bot_logger.debug('Retrieved song: %s', title)
