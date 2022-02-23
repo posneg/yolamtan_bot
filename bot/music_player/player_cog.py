@@ -4,6 +4,7 @@ from bot import yolamtanbot
 
 #import bot.music_player.player
 from bot.music_player.player import Player
+from bot.music_player.spotify_api import SpotifyControls
 
 # Manages all of the players. 
 # Handles requests directly from discord, passing them along to their appropriate players
@@ -13,6 +14,7 @@ class PlayerCog(commands.Cog):
         self.players = {}
         self.bot = bot
         self.bot.bot_logger.debug('Initializing player cog')
+        self.spotify = SpotifyControls(bot)
 
     async def create_player_if_needed(self, guild_id):
         if not guild_id in self.players.keys():
@@ -111,6 +113,17 @@ class PlayerCog(commands.Cog):
     )
     async def stop(self, ctx):
         await self.players[ctx.message.guild.id].stop(ctx)
+
+    @commands.command(
+        brief="Adds a randomly generated song to the queue",
+        help="""Uses spotify api to query a random song. Then adds that song's title and artist to 
+        a youtube search query and plays what is returned from there.""",
+        name="random_song"
+    )
+    async def random_song(self, ctx):
+        song_query = self.spotify.get_random_song()
+        self.bot.bot_logger.debug('Playing random song from search query %s', song_query)
+        await self.players[ctx.message.guild.id].play(ctx, song_query)
 
 
     @play.before_invoke

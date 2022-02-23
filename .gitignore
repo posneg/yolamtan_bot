@@ -10,3 +10,4 @@ __pycache__/
 *$py.class
 
 *.mp3
+.cache

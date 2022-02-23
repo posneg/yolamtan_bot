@@ -9,3 +9,9 @@ prefix = '$'
 
 # The folder where you would like logs stored.
 logs_loc = "C:/Users/admin/logs/"
+
+
+# Spotify api tokens are only used for certain commands
+# Bot only uses server-to-server authentication
+spotify_client_id=""
+spotify_client_secret=""
