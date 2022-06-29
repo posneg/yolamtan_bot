@@ -130,8 +130,17 @@ class Player:
             self.bot.bot_logger.debug('Ended song')
             if not error and not vc.is_paused() and not vc.is_playing() and not self.music_queue.empty():
                 current_song = self.music_queue.get()
-                self.bot.bot_logger.debug('Playing song from callback: %s', current_song.get_title())
-                vc.play(current_song.get_audio_source(), after=after_song_end)
+                coro = vc.play(current_song.get_audio_source(), after=after_song_end)
+
+                fut = asyncio.run_coroutine_threadsafe(coro, self.bot.loop)
+                
+                try:
+                    fut.result()
+                    self.bot.bot_logger.debug('Playing song from callback: %s', current_song.get_title())
+                except:
+                    self.bot.bot_logger.debug('Error occurred when trying to play next song in queue')
+                    pass
+
 
         if not vc.is_playing() and not self.music_queue.empty():
             current_song = self.music_queue.get()
