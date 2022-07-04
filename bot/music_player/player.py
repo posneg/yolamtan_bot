@@ -1,6 +1,7 @@
 import discord
 from discord.ext import commands
 import ffmpeg
+from threading import Lock
 import queue
 
 from bot.music_player.filters import filters
@@ -44,6 +45,7 @@ class Player:
         self.music_queue = queue.Queue()
         self.current_song = None
         self.bot = bot
+        self.lock = Lock()
         self.bot.bot_logger.debug('Inititalizing player for guild id: %s', guild_id)
 
 
@@ -124,22 +126,17 @@ class Player:
 
 
     def play_next_song_in_queue(self, ctx):
+        self.lock.acquire()
         vc = ctx.voice_client
 
         def after_song_end(error):
             self.bot.bot_logger.debug('Ended song')
+            self.lock.acquire()
             if not error and not vc.is_paused() and not vc.is_playing() and not self.music_queue.empty():
                 current_song = self.music_queue.get()
-                coro = vc.play(current_song.get_audio_source(), after=after_song_end)
-
-                fut = asyncio.run_coroutine_threadsafe(coro, self.bot.loop)
-                
-                try:
-                    fut.result()
-                    self.bot.bot_logger.debug('Playing song from callback: %s', current_song.get_title())
-                except:
-                    self.bot.bot_logger.debug('Error occurred when trying to play next song in queue')
-                    pass
+                self.bot.bot_logger.debug('Playing song from callback: %s', current_song.get_title())
+                vc.play(current_song.get_audio_source(), after=after_song_end)
+            self.lock.release()
 
 
         if not vc.is_playing() and not self.music_queue.empty():
@@ -147,44 +144,41 @@ class Player:
             self.bot.bot_logger.debug('Playing song: %s', current_song.get_title())
             vc.play(current_song.get_audio_source(), after=after_song_end)
             self.current_song = current_song
+        self.lock.release()
             
 
     async def skip(self, ctx):
         self.bot.bot_logger.debug('Attempting to skip')
+        self.lock.acquire()
         vc = ctx.voice_client
         if vc.is_playing():
             vc.stop()
             self.bot.bot_logger.debug('Stopped current song. Callback should start next song.')
+        self.lock.release()
 
 
     async def pause(self, ctx):
-        vc = ctx.message.guild.voice_client
         self.bot.bot_logger.debug('Attempting to pause')
+        self.lock.acquire()
+        vc = ctx.message.guild.voice_client
         if vc.is_playing():
             vc.pause()
             self.bot.bot_logger.debug('Paused voice client')
         else:
             await ctx.send("The bot is not playing anything right now.")
+        self.lock.release()
 
 
     async def resume(self, ctx):
         self.bot.bot_logger.debug('Attempting to resume song')
+        self.lock.acquire()
         vc = ctx.message.guild.voice_client
         if vc.is_paused():
             vc.resume()
             self.bot.bot_logger.debug('Resumed song')
         else:
             await ctx.send("The bot was not playing anything before this. Use play command.")
-
-
-    async def stop(self, ctx):
-        self.bot.bot_logger.debug('Attempting to stop voice client')
-        vc = ctx.message.guild.voice_client
-        if vc.is_playing():
-            vc.stop()
-            self.bot.bot_logger.debug('Stoped voice client')
-        else:
-            await ctx.send("The bot is not playing anything right now.")
+        self.lock.release()
 
 
 

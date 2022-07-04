@@ -70,6 +70,7 @@ class PlayerCog(commands.Cog):
         automatically add bot to a voice channel if its not in one already.""",
         name="play"
     )
+    @commands.max_concurrency(1, per=commands.BucketType.guild, wait=True)
     async def play(self, ctx, *, search_input):
         self.bot.bot_logger.debug('Recieved play command with search input %s', search_input)
         await self.create_player_if_needed(ctx.message.guild.id)
