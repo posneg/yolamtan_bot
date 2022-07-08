@@ -58,22 +58,6 @@ class Player:
         return "{Id: " + self.guild_id + "}"
 
 
-    def get_guild_id(self):
-        return self.guild_id
-
-
-    def get_current_song(self):
-        return self.current_song
-
-
-    async def get_current_song(self, ctx):
-        vc = ctx.message.guild.voice_client
-        if vc.is_playing:
-            await ctx.send("Current song is "+self.current_song.get_title())
-        else:
-            await ctx.send("No song is playing")
-
-
     async def play_local_song(self, ctx, song_name, filter):
         self.bot.bot_logger.debug('Attempting to play local song: %s', song_name)
         local_song = self.create_local_audio_source(song_name, filter)
@@ -91,6 +75,7 @@ class Player:
             duration = ffmpeg.probe(song_name+".mp3")['format']['duration']
 
         return song.Song(audio_source, song_name, duration)
+
 
     # Plays from a url (almost anything youtube_dl supports)
     async def play(self, ctx, search_input):
@@ -116,23 +101,22 @@ class Player:
             title = yt_object['data']['title']
             self.bot.bot_logger.debug('Retrieved song: %s', title)
 
-            audio_source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(source=url_player, **ffmpeg_options))
-            self.bot.bot_logger.debug('Audio source retrieved for %s', title)
             duration = yt_object['data']['duration']
             
-            yt_song = song.Song(audio_source, title, duration)
+            yt_song = song.Song(url_player, title, duration)
             await self.music_queue.put(yt_song)
             self.bot.bot_logger.debug('Added %s to queue', title)
         
-            await ctx.send("Added "+title+" to queue. Duration: "+yt_song.get_duration_formatted())
+            await ctx.send("Added **"+title+"** to queue.\nDuration: "+yt_song.get_duration_formatted()+"")
+
 
     async def play_music(self):
         while True:
             self.next.clear()
 
             try:
-                # 5 minutes of no songs and bot times out
-                async with timeout(300):
+                # 30 minutes of no songs and bot times out
+                async with timeout(1800):
                     self.bot.bot_logger.debug("Looking for next song in the queue")
                     self.current_song = await self.music_queue.get()
             except asyncio.TimeoutError:
@@ -140,7 +124,12 @@ class Player:
                 return
 
             self.bot.bot_logger.debug("Playing song %s", self.current_song.get_title())
-            self._ctx.voice_client.play(self.current_song.get_audio_source(), after=self.play_next_song)
+
+            # Youtube streams expire so we have to get it here
+            audio_source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(source=self.current_song.get_player(), **ffmpeg_options))
+            self.current_song.set_audio_source(audio_source)
+            self.bot.bot_logger.debug('Audio source retrieved for %s', self.current_song.get_title())
+            self._ctx.voice_client.play(audio_source, after=self.play_next_song)
             
             # Wait here until self.next.set() is called
             await self.next.wait()
@@ -156,7 +145,6 @@ class Player:
         
         # Attempt to play next song
         self.next.set()
-
             
 
     async def skip(self, ctx):
@@ -198,6 +186,7 @@ class Player:
         self.bot.bot_logger.debug("Killing player for guild %s with die function", self.guild_id)
         self.alive = False
         self.music_queue._queue.clear()
+        await self._ctx.send("Goodbye :wave:")
         await self._ctx.voice_client.disconnect()
 
     def is_alive(self):
@@ -205,6 +194,23 @@ class Player:
 
     def get_ctx(self):
         return self._ctx
+
+    def get_guild_id(self):
+        return self.guild_id
+
+    def get_current_song(self):
+        return self.current_song
+
+    def get_queue_size(self):
+        return self.music_queue.qsize()
+
+
+    async def get_current_song(self, ctx):
+        vc = ctx.message.guild.voice_client
+        if vc.is_playing:
+            await ctx.send("Current song is "+self.current_song.get_title())
+        else:
+            await ctx.send("No song is playing")
 
 
 

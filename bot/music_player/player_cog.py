@@ -14,9 +14,11 @@ class PlayerCog(commands.Cog):
         self.check_for_dead_players.start()
         
     async def create_player_if_needed(self, guild_id, ctx):
-        if not guild_id in self.players.keys():
+        if not guild_id in self.players.keys() or not ctx.voice_client:      
             self.bot.bot_logger.debug('Creating new player for guild id: %s', guild_id)
             self.players[guild_id] = Player(guild_id, self.bot, ctx)
+            await ctx.send("Hello! :notes:")
+
 
     @commands.command(
         brief="Adds bot to voice channel",
@@ -30,7 +32,6 @@ class PlayerCog(commands.Cog):
         else:
             await self.create_player_if_needed(ctx.message.guild.id, ctx)
             channel = ctx.message.author.voice.channel
-            await ctx.send("Hello! :notes:")
   
         self.bot.bot_logger.debug('Attempting to connect to channel in guild id: %s', ctx.message.guild.id)
         await channel.connect()
@@ -44,8 +45,8 @@ class PlayerCog(commands.Cog):
     async def leave_voice(self, ctx):
         # Add some kind of error handling for when the bot is disconnected by force? 
         # It gets buggy if the bot isn't disconnected through here
-        await ctx.send("Goodbye :wave:")
         if (ctx.voice_client):
+            await ctx.send("Goodbye :wave:")
             await ctx.voice_client.disconnect()
         self.players.pop(ctx.message.guild.id)
         self.bot.bot_logger.debug('Disconnected and deleted player in guild id: %s', ctx.message.guild.id)
@@ -117,7 +118,6 @@ class PlayerCog(commands.Cog):
 
     @tasks.loop(seconds=10.0)
     async def check_for_dead_players(self):
-        self.bot.bot_logger.debug("Checking for dead players")
         players_to_delete = []
 
         for id in self.players:
