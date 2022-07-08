@@ -1,8 +1,8 @@
+from async_timeout import timeout
 import discord
 from discord.ext import commands
 import ffmpeg
 from threading import Lock
-import queue
 
 from bot.music_player.filters import filters
 from bot.music_player import song
@@ -35,18 +35,23 @@ ffmpeg_options = {
     'options': '-vn -b:a 256k -af bass=g=2'
 }
 
-## Does it matter if ytdl is not player specific?
 ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
 ###########
 
 class Player:
-    def __init__(self, guild_id, bot: yolamtanbot.YolamtanBot):
+    def __init__(self, guild_id, bot: yolamtanbot.YolamtanBot, ctx: commands.Context):
         self.guild_id = guild_id
-        self.music_queue = queue.Queue()
+        self.music_queue = asyncio.Queue()
+        self.next = asyncio.Event() 
         self.current_song = None
+        self._ctx = ctx  # context the bot was created in
         self.bot = bot
         self.lock = Lock()
+        self.alive = True
         self.bot.bot_logger.debug('Inititalizing player for guild id: %s', guild_id)
+        
+        self.loop = asyncio.get_event_loop()
+        self.loop.create_task(self.play_music())
 
 
     def __str__(self):
@@ -72,11 +77,10 @@ class Player:
     async def play_local_song(self, ctx, song_name, filter):
         self.bot.bot_logger.debug('Attempting to play local song: %s', song_name)
         local_song = self.create_local_audio_source(song_name, filter)
-        self.music_queue.put(local_song)
+        await self.music_queue.put(local_song)
         self.bot.bot_logger.debug('Added local song %s to queue', song_name)
         await ctx.send("Added "+song_name+" to queue. Duration: "+local_song.get_duration_formatted())
 
-        self.play_next_song_in_queue(ctx)
 
     def create_local_audio_source(self, song_name, filter_name):
         if ("" != filter_name):
@@ -112,39 +116,47 @@ class Player:
             title = yt_object['data']['title']
             self.bot.bot_logger.debug('Retrieved song: %s', title)
 
-            audio_source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(url_player, **ffmpeg_options))
+            audio_source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(source=url_player, **ffmpeg_options))
             self.bot.bot_logger.debug('Audio source retrieved for %s', title)
             duration = yt_object['data']['duration']
             
             yt_song = song.Song(audio_source, title, duration)
-            self.music_queue.put(yt_song)
+            await self.music_queue.put(yt_song)
             self.bot.bot_logger.debug('Added %s to queue', title)
         
             await ctx.send("Added "+title+" to queue. Duration: "+yt_song.get_duration_formatted())
 
-            self.play_next_song_in_queue(ctx)
+    async def play_music(self):
+        while True:
+            self.next.clear()
+
+            try:
+                # 5 minutes of no songs and bot times out
+                async with timeout(300):
+                    self.bot.bot_logger.debug("Looking for next song in the queue")
+                    self.current_song = await self.music_queue.get()
+            except asyncio.TimeoutError:
+                await self.die()
+                return
+
+            self.bot.bot_logger.debug("Playing song %s", self.current_song.get_title())
+            self._ctx.voice_client.play(self.current_song.get_audio_source(), after=self.play_next_song)
+            
+            # Wait here until self.next.set() is called
+            await self.next.wait()
 
 
-    def play_next_song_in_queue(self, ctx):
-        self.lock.acquire()
-        vc = ctx.voice_client
+    def play_next_song(self, error=None):
+        self.bot.bot_logger.debug('Ended song %s', self.current_song.get_title())
+        self.current_song.get_audio_source().cleanup()
+        self.current_song = None
 
-        def after_song_end(error):
-            self.bot.bot_logger.debug('Ended song')
-            self.lock.acquire()
-            if not error and not vc.is_paused() and not vc.is_playing() and not self.music_queue.empty():
-                current_song = self.music_queue.get()
-                self.bot.bot_logger.debug('Playing song from callback: %s', current_song.get_title())
-                vc.play(current_song.get_audio_source(), after=after_song_end)
-            self.lock.release()
+        if error:
+            self.bot.bot_logger.error('Encountered error in playing next song %s', error)
+        
+        # Attempt to play next song
+        self.next.set()
 
-
-        if not vc.is_playing() and not self.music_queue.empty():
-            current_song = self.music_queue.get()
-            self.bot.bot_logger.debug('Playing song: %s', current_song.get_title())
-            vc.play(current_song.get_audio_source(), after=after_song_end)
-            self.current_song = current_song
-        self.lock.release()
             
 
     async def skip(self, ctx):
@@ -180,6 +192,19 @@ class Player:
             await ctx.send("The bot was not playing anything before this. Use play command.")
         self.lock.release()
 
+
+    # Removes bot from voice channel from within the player
+    async def die(self):
+        self.bot.bot_logger.debug("Killing player for guild %s with die function", self.guild_id)
+        self.alive = False
+        self.music_queue._queue.clear()
+        await self._ctx.voice_client.disconnect()
+
+    def is_alive(self):
+        return self.alive
+
+    def get_ctx(self):
+        return self._ctx
 
 
 
