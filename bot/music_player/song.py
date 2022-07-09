@@ -1,15 +1,15 @@
 import math
 
 class Song:
-    def __init__(self, player, title="", duration=0.0):
-        self.player = player
+    def __init__(self, url, title="", duration=0.0):
+        self.url = url
         self.audio_source = None
         self.title = title
         self.duration = float(duration)
 
 
-    def get_player(self):
-        return self.player
+    def get_url(self):
+        return self.url
 
 
     def set_audio_source(self, source):

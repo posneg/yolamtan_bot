@@ -95,15 +95,17 @@ class Player:
             #     self.bot.bot_logger.debug('Retrieved audio source for filtered song %s', title)
             #     duration = ffmpeg.probe(filename+"_"+filter_name+"."+extension)['format']['duration']
 
+
+            # Still getting youtube url here so that we can get song info and return the retrieved song to chat
             self.bot.bot_logger.debug('Getting audio from search input: %s', search_input)
             yt_object = await YTDLSource.from_url(search_input, stream=True)
-            url_player = yt_object['file']
+            url = yt_object['player_url']
             title = yt_object['data']['title']
             self.bot.bot_logger.debug('Retrieved song: %s', title)
 
             duration = yt_object['data']['duration']
             
-            yt_song = song.Song(url_player, title, duration)
+            yt_song = song.Song(url, title, duration)
             await self.music_queue.put(yt_song)
             self.bot.bot_logger.debug('Added %s to queue', title)
         
@@ -126,9 +128,14 @@ class Player:
             self.bot.bot_logger.debug("Playing song %s", self.current_song.get_title())
 
             # Youtube streams expire so we have to get it here
-            audio_source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(source=self.current_song.get_player(), **ffmpeg_options))
+            self.bot.bot_logger.debug('Getting audio from url again: %s', self.current_song.get_url())
+            yt_object = await YTDLSource.from_url(self.current_song.get_url(), stream=True)
+            title = yt_object['data']['title']
+            self.bot.bot_logger.debug('Retrieved song: %s again', title)
+            audio_source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(source=self.current_song.get_url(), **ffmpeg_options))
             self.current_song.set_audio_source(audio_source)
             self.bot.bot_logger.debug('Audio source retrieved for %s', self.current_song.get_title())
+
             self._ctx.voice_client.play(audio_source, after=self.play_next_song)
             
             # Wait here until self.next.set() is called
@@ -219,7 +226,6 @@ class YTDLSource(discord.PCMVolumeTransformer):
         super().__init__(source, volume)
 
         self.data = data
-        self.filename = ""
 
         self.title = data.get('title')
         self.url = data.get('url')
@@ -233,5 +239,5 @@ class YTDLSource(discord.PCMVolumeTransformer):
             # take first item from a playlist
             data = data['entries'][0]
 
-        filename = data['url'] if stream else ytdl.prepare_filename(data)
-        return {'file': filename, 'data': data}
+        link = data['url'] if stream else ytdl.prepare_filename(data)
+        return {'player_url': link, 'data': data}
