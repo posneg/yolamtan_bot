@@ -48,6 +48,7 @@ class Player:
         self.bot = bot
         self.lock = Lock()
         self.alive = True
+        self.volume = 0.5
         self.bot.bot_logger.debug('Inititalizing player for guild id: %s', guild_id)
         
         self.loop = asyncio.get_event_loop()
@@ -105,7 +106,7 @@ class Player:
 
             duration = yt_object['data']['duration']
             
-            yt_song = song.Song(url, title, duration)
+            yt_song = song.Song(url, search_input, title, duration)
             await self.music_queue.put(yt_song)
             self.bot.bot_logger.debug('Added %s to queue', title)
         
@@ -129,10 +130,11 @@ class Player:
 
             # Youtube streams expire so we have to get it here
             self.bot.bot_logger.debug('Getting audio from url again: %s', self.current_song.get_url())
-            yt_object = await YTDLSource.from_url(self.current_song.get_url(), stream=True)
+            yt_object = await YTDLSource.from_url(self.current_song.get_search_input(), stream=True)
             title = yt_object['data']['title']
             self.bot.bot_logger.debug('Retrieved song: %s again', title)
-            audio_source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(source=self.current_song.get_url(), **ffmpeg_options))
+            audio_source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(source=yt_object['player_url'], **ffmpeg_options))
+            audio_source.volume = self.volume
             self.current_song.set_audio_source(audio_source)
             self.bot.bot_logger.debug('Audio source retrieved for %s', self.current_song.get_title())
 
