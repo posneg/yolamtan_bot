@@ -9,11 +9,11 @@ from bot.music_player import song
 
 # Used for ytdl
 import asyncio
-import youtube_dl
+import yt_dlp
 from bot import yolamtanbot
 
 # Suppress noise about console usage from errors
-youtube_dl.utils.bug_reports_message = lambda: ''
+yt_dlp.utils.bug_reports_message = lambda: ''
 
 #### YTDL OPTIONS
 ytdl_format_options = {
@@ -35,7 +35,7 @@ ffmpeg_options = {
     'options': '-vn -b:a 256k -af bass=g=2'
 }
 
-ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
+ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
 ###########
 
 class Player:
@@ -78,7 +78,7 @@ class Player:
         return song.Song(audio_source, song_name, duration)
 
 
-    # Plays from a url (almost anything youtube_dl supports)
+    # Plays from a url (almost anything yt_dlp supports)
     async def play(self, ctx, search_input):
         async with ctx.typing():
             # Unusued filter code, will be used in a seperate filter-supported command
@@ -195,8 +195,6 @@ class Player:
         self.bot.bot_logger.debug("Killing player for guild %s with die function", self.guild_id)
         self.alive = False
         self.music_queue._queue.clear()
-        await self._ctx.send("Goodbye :wave:")
-        await self._ctx.voice_client.disconnect()
 
     def is_alive(self):
         return self.alive
@@ -217,7 +215,7 @@ class Player:
     async def get_current_song(self, ctx):
         vc = ctx.message.guild.voice_client
         if vc.is_playing:
-            await ctx.send("Current song is "+self.current_song.get_title())
+            await ctx.send("Now Playing: **"+self.current_song.get_title() + "**")
         else:
             await ctx.send("No song is playing")
 

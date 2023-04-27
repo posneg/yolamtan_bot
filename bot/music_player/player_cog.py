@@ -80,6 +80,15 @@ class PlayerCog(commands.Cog):
 
         await self.players[ctx.message.guild.id].play(ctx, search_input)
 
+    @commands.command(
+        brief="Displays the currently playing song",
+        help="""Sends a message to the command's channel showing the currently playing song.
+        If a song is not playing, instead responds as such.""",
+        name="now_playing"
+    )
+    async def now_playing(self, ctx):
+        await self.players[ctx.message.guild.id].get_current_song(ctx)
+
 
     @commands.command(
         brief="Skips the current song",
@@ -106,23 +115,13 @@ class PlayerCog(commands.Cog):
         await self.players[ctx.message.guild.id].resume(ctx)
 
 
-    @commands.command(
-        brief="Stops the song currently being played",
-        help="""Stops the song currently being played. You cannot resume play of this song.
-        When you request to play a new song, it will start playing whatever was next
-        in the queue.""",
-        name="stop"
-    )
-    async def stop(self, ctx):
-        await self.players[ctx.message.guild.id].stop(ctx)
-
     @tasks.loop(seconds=10.0)
     async def check_for_dead_players(self):
         players_to_delete = []
 
         for id in self.players:
             if not self.players[id].is_alive():
-                self.bot.bot_logger.debug("Playing for server %s has elimated itself and will play no more.", id)
+                self.bot.bot_logger.debug("Playing for server %s has eliminated itself and will play no more.", id)
                 players_to_delete.append(id)
 
         for id in players_to_delete:
