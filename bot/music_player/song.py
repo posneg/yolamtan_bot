@@ -1,7 +1,7 @@
 import math
 
 class Song:
-    def __init__(self, url, search_input, title="", duration=0.0, ):
+    def __init__(self, url, search_input, title="", duration=0.0):
         self.url = url
         self.audio_source = None
         self.title = title

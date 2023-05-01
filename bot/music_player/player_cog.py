@@ -48,6 +48,7 @@ class PlayerCog(commands.Cog):
         if (ctx.voice_client):
             await ctx.send("Goodbye :wave:")
             await ctx.voice_client.disconnect()
+            await self.players[ctx.message.guild.id].die()
         self.players.pop(ctx.message.guild.id)
         self.bot.bot_logger.debug('Disconnected and deleted player in guild id: %s', ctx.message.guild.id)
 
@@ -79,6 +80,19 @@ class PlayerCog(commands.Cog):
         await self.create_player_if_needed(ctx.message.guild.id, ctx)
 
         await self.players[ctx.message.guild.id].play(ctx, search_input)
+
+
+    @commands.command(
+        brief="Queues a song to play after the current song ends",
+        name="play_next"
+    )
+    @commands.max_concurrency(1, per=commands.BucketType.guild, wait=True)
+    async def play_next(self, ctx, *, search_input):
+        self.bot.bot_logger.debug('Recieved play_next command with search input %s', search_input)
+        await self.create_player_if_needed(ctx.message.guild.id, ctx)
+
+        await self.players[ctx.message.guild.id].play(ctx, search_input, True)
+
 
     @commands.command(
         brief="Displays the currently playing song",

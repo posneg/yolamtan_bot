@@ -18,6 +18,7 @@ yt_dlp.utils.bug_reports_message = lambda: ''
 #### YTDL OPTIONS
 ytdl_format_options = {
     'format': 'bestaudio/best',
+    'compat-options': 'format-sort', # audio plays clearer for me using the old youtube_dl "best" format opts
     'outtmpl': '%(extractor)s-%(id)s-%(title)s.%(ext)s',
     'restrictfilenames': True,
     'noplaylist': True,
@@ -32,6 +33,7 @@ ytdl_format_options = {
 
 # 'options': '-vn -b:a 128k -af bass=g=2'
 ffmpeg_options = {
+    'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
     'options': '-vn -b:a 256k -af bass=g=2'
 }
 
@@ -41,7 +43,8 @@ ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
 class Player:
     def __init__(self, guild_id, bot: yolamtanbot.YolamtanBot, ctx: commands.Context):
         self.guild_id = guild_id
-        self.music_queue = asyncio.Queue()
+        self.music_queue = asyncio.PriorityQueue()
+        self.highest_priority_num = 100   # bigger numbers = lower priority in the queue
         self.next = asyncio.Event() 
         self.current_song = None
         self._ctx = ctx  # context the bot was created in
@@ -62,7 +65,7 @@ class Player:
     async def play_local_song(self, ctx, song_name, filter):
         self.bot.bot_logger.debug('Attempting to play local song: %s', song_name)
         local_song = self.create_local_audio_source(song_name, filter)
-        await self.music_queue.put(local_song)
+        await self.music_queue.put((self.highest_priority_num, local_song))
         self.bot.bot_logger.debug('Added local song %s to queue', song_name)
         await ctx.send("Added "+song_name+" to queue. Duration: "+local_song.get_duration_formatted())
 
@@ -79,7 +82,7 @@ class Player:
 
 
     # Plays from a url (almost anything yt_dlp supports)
-    async def play(self, ctx, search_input):
+    async def play(self, ctx, search_input, play_next=False):
         async with ctx.typing():
             # Unusued filter code, will be used in a seperate filter-supported command
             # if ("" != filter_name):
@@ -96,6 +99,11 @@ class Player:
             #     self.bot.bot_logger.debug('Retrieved audio source for filtered song %s', title)
             #     duration = ffmpeg.probe(filename+"_"+filter_name+"."+extension)['format']['duration']
 
+            # Set song queue priority
+            q_priority_offset = 0
+            if (play_next):
+                q_priority_offset = 1
+                self.highest_priority_num = self.highest_priority_num-1
 
             # Still getting youtube url here so that we can get song info and return the retrieved song to chat
             self.bot.bot_logger.debug('Getting audio from search input: %s', search_input)
@@ -107,7 +115,7 @@ class Player:
             duration = yt_object['data']['duration']
             
             yt_song = song.Song(url, search_input, title, duration)
-            await self.music_queue.put(yt_song)
+            await self.music_queue.put((self.highest_priority_num-q_priority_offset, yt_song))
             self.bot.bot_logger.debug('Added %s to queue', title)
         
             await ctx.send("Added **"+title+"** to queue.\nDuration: "+yt_song.get_duration_formatted()+"")
@@ -125,6 +133,11 @@ class Player:
             except asyncio.TimeoutError:
                 await self.die()
                 return
+
+            if (self.current_song[0] < 100):
+                self.highest_priority_num = self.highest_priority_num + 1
+            # set current song back to song object, not the priority queue tuple
+            self.current_song = self.current_song[1]
 
             self.bot.bot_logger.debug("Playing song %s", self.current_song.get_title())
 
