@@ -1,8 +1,8 @@
 from async_timeout import timeout
+from collections import deque
 import discord
 from discord.ext import commands
 import ffmpeg
-from threading import Lock
 
 from bot.music_player.filters import filters
 from bot.music_player import song
@@ -43,13 +43,12 @@ ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
 class Player:
     def __init__(self, guild_id, bot: yolamtanbot.YolamtanBot, ctx: commands.Context):
         self.guild_id = guild_id
-        self.music_queue = asyncio.PriorityQueue()
-        self.highest_priority_num = 100   # bigger numbers = lower priority in the queue
+        self.music_queue = deque()
+        self.queue_count = asyncio.Semaphore(value=0)
         self.next = asyncio.Event() 
         self.current_song = None
         self._ctx = ctx  # context the bot was created in
         self.bot = bot
-        self.lock = Lock()
         self.alive = True
         self.volume = 0.5
         self.bot.bot_logger.debug('Inititalizing player for guild id: %s', guild_id)
@@ -65,7 +64,8 @@ class Player:
     async def play_local_song(self, ctx, song_name, filter):
         self.bot.bot_logger.debug('Attempting to play local song: %s', song_name)
         local_song = self.create_local_audio_source(song_name, filter)
-        await self.music_queue.put((self.highest_priority_num, local_song))
+        self.music_queue.append(local_song)
+        self.queue_count.release()
         self.bot.bot_logger.debug('Added local song %s to queue', song_name)
         await ctx.send("Added "+song_name+" to queue. Duration: "+local_song.get_duration_formatted())
 
@@ -99,12 +99,6 @@ class Player:
             #     self.bot.bot_logger.debug('Retrieved audio source for filtered song %s', title)
             #     duration = ffmpeg.probe(filename+"_"+filter_name+"."+extension)['format']['duration']
 
-            # Set song queue priority
-            q_priority_offset = 0
-            if (play_next):
-                q_priority_offset = 1
-                self.highest_priority_num = self.highest_priority_num-1
-
             # Still getting youtube url here so that we can get song info and return the retrieved song to chat
             self.bot.bot_logger.debug('Getting audio from search input: %s', search_input)
             yt_object = await YTDLSource.from_url(search_input, stream=True)
@@ -113,11 +107,16 @@ class Player:
             self.bot.bot_logger.debug('Retrieved song: %s', title)
 
             duration = yt_object['data']['duration']
-            
+
             yt_song = song.Song(url, search_input, title, duration)
-            await self.music_queue.put((self.highest_priority_num-q_priority_offset, yt_song))
+            if not play_next:
+                self.music_queue.append(yt_song)
+            else:
+                self.music_queue.appendleft(yt_song)
             self.bot.bot_logger.debug('Added %s to queue', title)
-        
+
+            self.queue_count.release()
+
             await ctx.send("Added **"+title+"** to queue.\nDuration: "+yt_song.get_duration_formatted()+"")
 
 
@@ -129,15 +128,12 @@ class Player:
                 # 30 minutes of no songs and bot times out
                 async with timeout(1800):
                     self.bot.bot_logger.debug("Looking for next song in the queue")
-                    self.current_song = await self.music_queue.get()
+                    await self.queue_count.acquire()
+                    self.current_song = self.music_queue.popleft()
             except asyncio.TimeoutError:
                 await self.die()
                 return
 
-            if (self.current_song[0] < 100):
-                self.highest_priority_num = self.highest_priority_num + 1
-            # set current song back to song object, not the priority queue tuple
-            self.current_song = self.current_song[1]
 
             self.bot.bot_logger.debug("Playing song %s", self.current_song.get_title())
 
@@ -171,43 +167,37 @@ class Player:
 
     async def skip(self, ctx):
         self.bot.bot_logger.debug('Attempting to skip')
-        self.lock.acquire()
         vc = ctx.voice_client
         if vc.is_playing():
             vc.stop()
             self.bot.bot_logger.debug('Stopped current song. Callback should start next song.')
-        self.lock.release()
 
 
     async def pause(self, ctx):
         self.bot.bot_logger.debug('Attempting to pause')
-        self.lock.acquire()
         vc = ctx.message.guild.voice_client
         if vc.is_playing():
             vc.pause()
             self.bot.bot_logger.debug('Paused voice client')
         else:
             await ctx.send("The bot is not playing anything right now.")
-        self.lock.release()
 
 
     async def resume(self, ctx):
         self.bot.bot_logger.debug('Attempting to resume song')
-        self.lock.acquire()
         vc = ctx.message.guild.voice_client
         if vc.is_paused():
             vc.resume()
             self.bot.bot_logger.debug('Resumed song')
         else:
             await ctx.send("The bot was not playing anything before this. Use play command.")
-        self.lock.release()
 
 
     # Removes bot from voice channel from within the player
     async def die(self):
         self.bot.bot_logger.debug("Killing player for guild %s with die function", self.guild_id)
         self.alive = False
-        self.music_queue._queue.clear()
+        self.music_queue.clear()
 
     def is_alive(self):
         return self.alive
@@ -218,16 +208,9 @@ class Player:
     def get_guild_id(self):
         return self.guild_id
 
-    def get_current_song(self):
-        return self.current_song
-
-    def get_queue_size(self):
-        return self.music_queue.qsize()
-
-
     async def get_current_song(self, ctx):
         vc = ctx.message.guild.voice_client
-        if vc.is_playing:
+        if self.current_song is not None:
             await ctx.send("Now Playing: **"+self.current_song.get_title() + "**")
         else:
             await ctx.send("No song is playing")
