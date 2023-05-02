@@ -15,8 +15,9 @@ class YolamtanBot(commands.Bot):
         self.data_file = data_path
         self.env = toml.load(env_path)
         self.data = toml.load(self.data_file)
+        intents = discord.Intents.all()
 
-        super().__init__(*args, command_prefix=self.env['prefix'], **kwargs)
+        super().__init__(*args, command_prefix=self.env['prefix'], intents=intents, **kwargs)
 
         # Set up logging
         bot_logfile = self.env['logs_loc'] + datetime.datetime.now().strftime("y%Ym%md%d.log")
@@ -31,7 +32,7 @@ class YolamtanBot(commands.Bot):
 
     # When the bot is ready, setup the "game" and print out to console
     async def on_ready(self):
-        game = discord.Game("in a shower of the blood of my friends *and* foes")
+        game = discord.Game("with fire")
         await self.change_presence(status=discord.Status.online, activity=game)
         print('We have logged in as {0.user}'.format(self))
 

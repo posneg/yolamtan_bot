@@ -1,10 +1,11 @@
-from bot.music_player.player import Player
+import asyncio
 import discord
 import logging
 from discord.ext import commands
 
 from constants import *
 from bot import yolamtanbot
+from bot.music_player.player import Player
 from bot.role_commands import color_roles
 from bot.role_commands import pronoun_roles
 from bot.music_player import player_cog
@@ -22,8 +23,11 @@ if __name__ == '__main__':
     discord_handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
     discord_logger.addHandler(discord_handler)
 
-    bot.add_cog(color_roles.ColorRoles(bot))
-    bot.add_cog(pronoun_roles.PronounRoles(bot))
-    bot.add_cog(player_cog.PlayerCog(bot))
+    async def main():
+        async with bot:
+            await bot.add_cog(color_roles.ColorRoles(bot))
+            await bot.add_cog(pronoun_roles.PronounRoles(bot))
+            await bot.add_cog(player_cog.PlayerCog(bot))
+            await bot.start(bot.env['token'])
 
-    bot.run(bot.env['token'])
+    asyncio.run(main())
