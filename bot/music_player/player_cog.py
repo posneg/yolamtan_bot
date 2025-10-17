@@ -1,8 +1,5 @@
-from discord.ext import commands
-
+from discord.ext import tasks, commands
 from bot import yolamtanbot
-
-#import bot.music_player.player
 from bot.music_player.player import Player
 
 # Manages all of the players. 
@@ -14,10 +11,14 @@ class PlayerCog(commands.Cog):
         self.bot = bot
         self.bot.bot_logger.debug('Initializing player cog')
 
-    async def create_player_if_needed(self, guild_id):
-        if not guild_id in self.players.keys():
+        self.check_for_dead_players.start()
+        
+    async def create_player_if_needed(self, guild_id, ctx):
+        if not guild_id in self.players.keys() or not ctx.voice_client:      
             self.bot.bot_logger.debug('Creating new player for guild id: %s', guild_id)
-            self.players[guild_id] = Player(guild_id, self.bot)
+            self.players[guild_id] = Player(guild_id, self.bot, ctx)
+            await ctx.send("Hello! :notes:")
+
 
     @commands.command(
         brief="Adds bot to voice channel",
@@ -29,7 +30,7 @@ class PlayerCog(commands.Cog):
             await ctx.send("{} is not connected to a voice channel".format(ctx.message.author.name))
             return
         else:
-            await self.create_player_if_needed(ctx.message.guild.id)
+            await self.create_player_if_needed(ctx.message.guild.id, ctx)
             channel = ctx.message.author.voice.channel
   
         self.bot.bot_logger.debug('Attempting to connect to channel in guild id: %s', ctx.message.guild.id)
@@ -44,8 +45,11 @@ class PlayerCog(commands.Cog):
     async def leave_voice(self, ctx):
         # Add some kind of error handling for when the bot is disconnected by force? 
         # It gets buggy if the bot isn't disconnected through here
-        await ctx.voice_client.disconnect()
-        del self.players[ctx.message.guild.id]
+        if (ctx.voice_client):
+            await ctx.send("Goodbye :wave:")
+            await ctx.voice_client.disconnect()
+            await self.players[ctx.message.guild.id].die()
+        self.players.pop(ctx.message.guild.id)
         self.bot.bot_logger.debug('Disconnected and deleted player in guild id: %s', ctx.message.guild.id)
 
 
@@ -58,7 +62,7 @@ class PlayerCog(commands.Cog):
     )
     async def play_local(self, ctx, song_name, filter=""):
         self.bot.bot_logger.debug('Recieved play_local command on song %s', song_name)
-        await self.create_player_if_needed(ctx.message.guild.id)
+        await self.create_player_if_needed(ctx.message.guild.id, ctx)
 
         await self.players[ctx.message.guild.id].play_local_song(ctx, song_name, filter)
 
@@ -70,11 +74,34 @@ class PlayerCog(commands.Cog):
         automatically add bot to a voice channel if its not in one already.""",
         name="play"
     )
+    @commands.max_concurrency(1, per=commands.BucketType.guild, wait=True)
     async def play(self, ctx, *, search_input):
         self.bot.bot_logger.debug('Recieved play command with search input %s', search_input)
-        await self.create_player_if_needed(ctx.message.guild.id)
+        await self.create_player_if_needed(ctx.message.guild.id, ctx)
 
         await self.players[ctx.message.guild.id].play(ctx, search_input)
+
+
+    @commands.command(
+        brief="Queues a song to play after the current song ends",
+        name="play_next"
+    )
+    @commands.max_concurrency(1, per=commands.BucketType.guild, wait=True)
+    async def play_next(self, ctx, *, search_input):
+        self.bot.bot_logger.debug('Recieved play_next command with search input %s', search_input)
+        await self.create_player_if_needed(ctx.message.guild.id, ctx)
+
+        await self.players[ctx.message.guild.id].play(ctx, search_input, True)
+
+
+    @commands.command(
+        brief="Displays the currently playing song",
+        help="""Sends a message to the command's channel showing the currently playing song.
+        If a song is not playing, instead responds as such.""",
+        name="now_playing"
+    )
+    async def now_playing(self, ctx):
+        await self.players[ctx.message.guild.id].get_current_song(ctx)
 
 
     @commands.command(
@@ -102,15 +129,18 @@ class PlayerCog(commands.Cog):
         await self.players[ctx.message.guild.id].resume(ctx)
 
 
-    @commands.command(
-        brief="Stops the song currently being played",
-        help="""Stops the song currently being played. You cannot resume play of this song.
-        When you request to play a new song, it will start playing whatever was next
-        in the queue.""",
-        name="stop"
-    )
-    async def stop(self, ctx):
-        await self.players[ctx.message.guild.id].stop(ctx)
+    @tasks.loop(seconds=10.0)
+    async def check_for_dead_players(self):
+        players_to_delete = []
+
+        for id in self.players:
+            if not self.players[id].is_alive():
+                self.bot.bot_logger.debug("Playing for server %s has eliminated itself and will play no more.", id)
+                players_to_delete.append(id)
+
+        for id in players_to_delete:
+            await self.leave_voice(self.players[id].get_ctx())
+
 
 
     @play.before_invoke
@@ -120,4 +150,4 @@ class PlayerCog(commands.Cog):
             if ctx.author.voice:
                 await ctx.author.voice.channel.connect()
             else:
-                await ctx.send("You are not connected to a voice channel.")
+                await ctx.send("You are not connected to a voice channel.")    

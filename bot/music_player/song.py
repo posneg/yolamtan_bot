@@ -1,10 +1,24 @@
 import math
 
 class Song:
-    def __init__(self, audio_source, title="", duration=0.0):
-        self.audio_source = audio_source
+    def __init__(self, url, search_input, title="", duration=0.0):
+        self.url = url
+        self.audio_source = None
         self.title = title
         self.duration = float(duration)
+        self.search_input = search_input
+
+
+    def get_search_input(self):
+        return self.search_input
+
+
+    def get_url(self):
+        return self.url
+
+
+    def set_audio_source(self, source):
+        self.audio_source = source
 
 
     def get_audio_source(self):
@@ -19,7 +33,7 @@ class Song:
     def get_duration(self):
         return self.duration
 
-    
+
     def get_duration_formatted(self):
         if (0 != self.duration or "" != self.duration):
             minutes = math.floor(self.duration/60.0)
