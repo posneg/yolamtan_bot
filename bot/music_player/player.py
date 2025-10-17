@@ -12,9 +12,6 @@ import asyncio
 import yt_dlp
 from bot import yolamtanbot
 
-# Suppress noise about console usage from errors
-yt_dlp.utils.bug_reports_message = lambda: ''
-
 #### YTDL OPTIONS
 ytdl_format_options = {
     'format': 'bestaudio/best',
