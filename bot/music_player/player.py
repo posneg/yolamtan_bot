@@ -29,9 +29,10 @@ ytdl_format_options = {
 }
 
 # 'options': '-vn -b:a 128k -af bass=g=2'
+# 'options': '-vn -b:a 256k -af "volume=0.5" bass=g=2'
 ffmpeg_options = {
     'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
-    'options': '-vn -b:a 256k -af bass=g=2'
+    'options': '-vn -b:a 256k -af "volume=0.5"'
 }
 
 ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
@@ -72,7 +73,7 @@ class Player:
             audio_source = filters[filter_name](song_name,"mp3")
             duration = ffmpeg.probe(song_name+"_"+filter_name+".mp3")['format']['duration']
         else:
-            audio_source = discord.FFmpegPCMAudio(song_name+".mp3", **ffmpeg_options)
+            audio_source = discord.FFmpegOpusAudio(song_name+".mp3", **ffmpeg_options)
             duration = ffmpeg.probe(song_name+".mp3")['format']['duration']
 
         return song.Song(audio_source, song_name, duration)
@@ -139,8 +140,9 @@ class Player:
             yt_object = await YTDLSource.from_url(self.current_song.get_search_input(), stream=True)
             title = yt_object['data']['title']
             self.bot.bot_logger.debug('Retrieved song: %s again', title)
-            audio_source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(source=yt_object['player_url'], **ffmpeg_options))
-            audio_source.volume = self.volume
+            #audio_source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(source=yt_object['player_url'], **ffmpeg_options))
+            #audio_source.volume = self.volume
+            audio_source = discord.FFmpegOpusAudio(source=yt_object['player_url'], **ffmpeg_options)
             self.current_song.set_audio_source(audio_source)
             self.bot.bot_logger.debug('Audio source retrieved for %s', self.current_song.get_title())
 
